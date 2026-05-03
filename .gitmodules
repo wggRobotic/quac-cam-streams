@@ -1,0 +1,3 @@
+[submodule "quac-interfaces"]
+	path = quac-interfaces
+	url = https://github.com/wggRobotic/quac-interfaces
