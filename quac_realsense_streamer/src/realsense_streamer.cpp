@@ -9,11 +9,6 @@ void handle_signal(int signum) {
 
 RealsenseStreamer::RealsenseStreamer() : Node("realsense_streamer")
 {
-  gst.ip_set = false;
-  gst.ip_subscriber = create_subscription<std_msgs::msg::String>("video_target_ip", 10, std::bind(&RealsenseStreamer::ip_callback, this, std::placeholders::_1));
-  image.publisher = create_publisher<quac_interfaces::msg::ImageBGRD>(std::string(get_name()) + "/bgrd", 10);
-  pointcloud.publisher = create_publisher<sensor_msgs::msg::PointCloud2>(std::string(get_name()) + "/points", 10);
-
   //capture
   {
     declare_parameter<std::string>("capture.serial_number", "12345");
@@ -68,6 +63,9 @@ RealsenseStreamer::RealsenseStreamer() : Node("realsense_streamer")
 
   //pointcloud
   {
+    declare_parameter<bool>("pointcloud.enable", true);
+    pointcloud.enable = get_parameter("pointcloud.enable").as_bool();
+
     declare_parameter<std::string>("pointcloud.frame", "cam_frame");
     pointcloud.frame = get_parameter("pointcloud.frame").as_string();
 
@@ -78,6 +76,9 @@ RealsenseStreamer::RealsenseStreamer() : Node("realsense_streamer")
 
   //image
   {
+    declare_parameter<bool>("image.enable", true);
+    image.enable = get_parameter("image.enable").as_bool();
+
     declare_parameter<std::string>("image.frame", "cam_frame");
     image.frame = get_parameter("image.frame").as_string();
 
@@ -86,8 +87,13 @@ RealsenseStreamer::RealsenseStreamer() : Node("realsense_streamer")
     image.interval_i = 0;
   }
 
+  gst.ip_set = false;
+  gst.ip_subscriber = create_subscription<std_msgs::msg::String>("video_target_ip", 10, std::bind(&RealsenseStreamer::ip_callback, this, std::placeholders::_1));
+  if (image.enable) image.publisher = create_publisher<quac_interfaces::msg::ImageBGRD>(std::string(get_name()) + "/bgrd", 10);
+  if (pointcloud.enable) pointcloud.publisher = create_publisher<sensor_msgs::msg::PointCloud2>(std::string(get_name()) + "/points", 10);
+
   RCLCPP_INFO(get_logger(), 
-    "Started realsense_streamer as '%s' with the following configuration:\n"
+    "Started with the following configuration:\n"
     "  capture:\n"
     "    serial_number: %s\n"
     "    fps: %d\n"
@@ -101,10 +107,24 @@ RealsenseStreamer::RealsenseStreamer() : Node("realsense_streamer")
     "    width: %d\n"
     "    height: %d\n"
     "    port: %d\n"
-    "    compression: %s",
-    get_name(),
+    "    compression: %s\n"
+    "    jpeg:\n"
+    "      quality: %d\n"
+    "    h264:\n"
+    "      bitrate: %d\n"
+    "      key_int_max: %d\n"
+    "  pointcloud:\n"
+    "    enable: %s\n"
+    "    interval: %d\n"
+    "    frame: %s\n"
+    "  image:\n"
+    "    enable: %s\n"
+    "    interval: %d\n"
+    "    frame: %s\n",
     capture.serial_number.c_str(), capture.fps, capture.color.width, capture.color.height, capture.depth.width, capture.depth.height,
-    gst.width, gst.height, gst.port, gst.compression.c_str()
+    gst.width, gst.height, gst.port, gst.compression.c_str(), gst.jpeg.quality, gst.h264.bitrate, gst.h264.key_int_max,
+    pointcloud.enable ? "true" : "false", pointcloud.interval, pointcloud.frame.c_str(),
+    image.enable ? "true" : "false", image.interval, image.frame.c_str()
   );
 }
 
@@ -231,10 +251,12 @@ void RealsenseStreamer::run()
 
   signal(SIGTERM, handle_signal);
   signal(SIGINT, handle_signal);
-  
-  pointcloud.working = false;
-  pointcloud.available = false;
-  pointcloud.thread = std::thread([this](){ pointcloud_loop();});
+  if (pointcloud.enable)
+  {
+    pointcloud.working = false;
+    pointcloud.available = false;
+    pointcloud.thread = std::thread([this](){ pointcloud_loop();});
+  }
 
   RCLCPP_INFO(get_logger(), "Camera opened");
   while (keep_running.load())
@@ -324,7 +346,7 @@ void RealsenseStreamer::run()
     }
 
     // image
-    if (image.interval_i == 0)
+    if (image.interval_i == 0 && image.enable)
     {
       rs2::frameset aligned_frames = align_to_color.process(frames);
       rs2::depth_frame aligned_depth_frame = aligned_frames.get_depth_frame();
@@ -356,11 +378,11 @@ void RealsenseStreamer::run()
       image.publisher->publish(image.msg);
     }
 
-    image.interval_i = (image.interval_i + 1) % image.interval;
+    if (image.enable) image.interval_i = (image.interval_i + 1) % image.interval;
 
     // pointcloud
-    pointcloud.interval_i++;
-    if (pointcloud.interval_i >= pointcloud.interval)
+    if (pointcloud.enable) pointcloud.interval_i++;
+    if (pointcloud.interval_i >= pointcloud.interval && pointcloud.enable)
     {
       pointcloud.mutex.lock();
       if (pointcloud.working == false)
@@ -373,7 +395,7 @@ void RealsenseStreamer::run()
     }
   }
 
-  pointcloud.thread.join();
+  if (pointcloud.enable) pointcloud.thread.join();
   capture.pipeline.stop();
   RCLCPP_INFO(get_logger(), "Closed camera");
 

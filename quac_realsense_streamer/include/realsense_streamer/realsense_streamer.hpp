@@ -59,6 +59,7 @@ public:
 
   struct
   {
+    bool enable;
     std::string frame;
 
     std::thread thread;
@@ -80,6 +81,7 @@ public:
 
   struct
   {
+    bool enable;
     std::string frame;
 
     int interval;

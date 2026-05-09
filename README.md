@@ -38,9 +38,11 @@ gst:
     key_int_max: int          # interval in which key frame is sent
 
 pointcloud:
+  enable: bool                # whether to enable pointcloud publishing
   interval: int               # interval in all frames in which pointcloud is published
   frame: String               # tf frame of depth camera
 image:
+  enable: bool                # whether to enable bgrd image publishing
   interval: int               # interval in all frames in which bgrd image is published
   frame: String               # tf frame of color camera
 ```
