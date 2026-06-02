@@ -88,9 +88,19 @@ RealsenseStreamer::RealsenseStreamer() : Node("realsense_streamer")
   }
 
   gst.ip_set = false;
-  gst.ip_subscriber = create_subscription<std_msgs::msg::String>("video_target_ip", 10, std::bind(&RealsenseStreamer::ip_callback, this, std::placeholders::_1));
-  if (image.enable) image.publisher = create_publisher<quac_interfaces::msg::ImageBGRD>(std::string(get_name()) + "/bgrd", 10);
-  if (pointcloud.enable) pointcloud.publisher = create_publisher<sensor_msgs::msg::PointCloud2>(std::string(get_name()) + "/points", 10);
+  gst.ip_subscriber = create_subscription<std_msgs::msg::String>(
+    "video_target_ip", 
+    rclcpp::SensorDataQoS(), 
+    std::bind(&RealsenseStreamer::ip_callback, this, std::placeholders::_1)
+  );
+  if (image.enable) image.publisher = create_publisher<quac_interfaces::msg::ImageBGRD>(
+    std::string(get_name()) + "/bgrd", 
+    rclcpp::QoS(2).best_effort().durability_volatile()
+  );
+  if (pointcloud.enable) pointcloud.publisher = create_publisher<sensor_msgs::msg::PointCloud2>(
+    std::string(get_name()) + "/points", 
+    rclcpp::QoS(2).best_effort().durability_volatile()
+  );
 
   RCLCPP_INFO(get_logger(), 
     "Started with the following configuration:\n"
