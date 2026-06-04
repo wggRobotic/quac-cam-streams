@@ -1,29 +1,21 @@
 #include <rclcpp/rclcpp.hpp>
-#include <librealsense2/rs.hpp>
 #include <std_msgs/msg/string.hpp>
 #include <quac_interfaces/msg/image_bgrd.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
 #include <sensor_msgs/point_cloud2_iterator.hpp>
 #include <gst/gst.h>
 #include <gst/app/gstappsrc.h>
-#include <thread>
-#include <mutex>
 
-class RealsenseStreamer : public rclcpp::Node
+class CamStreamer : public rclcpp::Node
 {
 public:
-  RealsenseStreamer();
-
-  void ip_callback(const std_msgs::msg::String::SharedPtr msg);
-  void run();
-
-  void pointcloud_loop();
+  CamStreamer(const std::string& name);
+  
+  void deinit();
+  void push_gst_frame(void* data);
 
   struct
   {
-    rs2::config cfg;
-    rs2::pipeline pipeline;
-    std::string serial_number;
     struct
     {
       int width, height;
@@ -33,6 +25,7 @@ public:
       int width, height;
     } depth;
     int fps;
+    std::string device_id;
   } capture;
 
   struct
@@ -62,18 +55,8 @@ public:
     bool enable;
     std::string frame;
 
-    std::thread thread;
-    
-    std::mutex mutex;
-    rs2::frameset frameset;
-    bool available;
-    bool working;
-
     int interval;
     int interval_i;
-
-    rs2::pointcloud pc;
-    rs2::points points;
 
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr publisher;
     sensor_msgs::msg::PointCloud2 msg;

@@ -1,9 +1,9 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>quac_realsense_streamer</name>
+  <name>quac_cam_streams</name>
   <version>0.0.0</version>
-  <description>Quac realsense2 streamer</description>
+  <description>Quac camera video and depth streaming</description>
   <maintainer email="robotik@wgg-neumarkt.de">pilot</maintainer>
   <license>Apache-2.0</license>
 

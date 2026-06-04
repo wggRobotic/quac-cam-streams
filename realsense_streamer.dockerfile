@@ -45,5 +45,5 @@ WORKDIR /quac
 COPY ./quac-interfaces /quac/src/quac-interfaces
 RUN . /opt/ros/humble/setup.bash && colcon build
 
-COPY ./quac_realsense_streamer /quac/src/quac_realsense_streamer
-RUN . /opt/ros/humble/setup.bash && . /quac/install/setup.bash && colcon build
+COPY ./quac_cam_streams /quac/src/quac_cam_streams
+RUN . /opt/ros/humble/setup.bash && . /quac/install/setup.bash && colcon build --cmake-args -DBUILD_REALSENSE_STREAMER=ON
