@@ -79,6 +79,7 @@ find_package(PkgConfig REQUIRED)
 pkg_check_modules(GST REQUIRED gstreamer-1.0)
 pkg_check_modules(GST_APP REQUIRED gstreamer-app-1.0)
 find_package(OpenCV REQUIRED)
+find_package(depthai REQUIRED)
 
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
@@ -101,6 +102,8 @@ target_include_directories(depthai_streamer PRIVATE
 target_link_libraries(depthai_streamer
   ${GST_LIBRARIES}
   ${GST_APP_LIBRARIES}
+  ${OpenCV_LIBS}
+  depthai::core
 )
 
 ament_target_dependencies(depthai_streamer

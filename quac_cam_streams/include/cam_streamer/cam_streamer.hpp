@@ -32,7 +32,7 @@ public:
   {
     GstElement* pipeline;
     GstElement* appsrc;
-    int width, height, port;
+    int port;
     std::string ip;
     bool ip_set;
     rclcpp::Subscription<std_msgs::msg::String>::SharedPtr ip_subscriber;

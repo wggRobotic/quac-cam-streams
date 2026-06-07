@@ -23,26 +23,26 @@ void RealsenseStreamer::pointcloud_loop()
 
   while (keep_running.load())
   {
-    pointcloud.mutex.lock();
-    if (pointcloud.available) pointcloud.working = true;
-    pointcloud.mutex.unlock();
+    rs.pointcloud.mutex.lock();
+    if (rs.pointcloud.available) rs.pointcloud.working = true;
+    rs.pointcloud.mutex.unlock();
 
-    if (pointcloud.working)
+    if (rs.pointcloud.working)
     {
-      rs2::frameset aligned_frames = align_to_depth.process(pointcloud.frameset);
+      rs2::frameset aligned_frames = align_to_depth.process(rs.pointcloud.frameset);
 
       rs2::depth_frame depth_frame = aligned_frames.get_depth_frame();
       rs2::video_frame color_frame = aligned_frames.get_color_frame();
 
-      pointcloud.points = pointcloud.pc.calculate(depth_frame);
-      pointcloud.pc.map_to(color_frame);
+      rs.pointcloud.points = rs.pointcloud.pc.calculate(depth_frame);
+      rs.pointcloud.pc.map_to(color_frame);
 
-      auto vertices = pointcloud.points.get_vertices();
-      auto tex_coords = pointcloud.points.get_texture_coordinates();
+      auto vertices = rs.pointcloud.points.get_vertices();
+      auto tex_coords = rs.pointcloud.points.get_texture_coordinates();
 
       const uint8_t* color_data = static_cast<const uint8_t*>(color_frame.get_data());
 
-      size_t num_points = pointcloud.points.size();
+      size_t num_points = rs.pointcloud.points.size();
 
       pointcloud.msg.header.stamp = now();
       pointcloud.msg.header.frame_id = pointcloud.frame;
@@ -95,10 +95,10 @@ void RealsenseStreamer::pointcloud_loop()
       }
 
       pointcloud.publisher->publish(pointcloud.msg);
-      pointcloud.mutex.lock();
-      pointcloud.working = false;
-      pointcloud.available = false;
-      pointcloud.mutex.unlock();
+      rs.pointcloud.mutex.lock();
+      rs.pointcloud.working = false;
+      rs.pointcloud.available = false;
+      rs.pointcloud.mutex.unlock();
     }
     else std::this_thread::sleep_for(std::chrono::milliseconds(5));
   }
@@ -113,31 +113,31 @@ void RealsenseStreamer::run()
     return;
   }
 
-  rs.capture.cfg.enable_device(rs.capture.device_id);
+  rs.capture.cfg.enable_device(capture.device_id);
   rs.capture.cfg.enable_stream(RS2_STREAM_COLOR, capture.color.width, capture.color.height, RS2_FORMAT_BGR8, capture.fps);
   rs.capture.cfg.enable_stream(RS2_STREAM_DEPTH, capture.depth.width, capture.depth.height, RS2_FORMAT_Z16, capture.fps);
 
   rs2::align align_to_color(RS2_STREAM_COLOR);
 
-  capture.pipeline.start(capture.cfg);
+  rs.capture.pipeline.start(rs.capture.cfg);
 
   signal(SIGTERM, handle_signal);
   signal(SIGINT, handle_signal);
   if (pointcloud.enable)
   {
-    pointcloud.working = false;
-    pointcloud.available = false;
-    pointcloud.thread = std::thread([this](){ pointcloud_loop();});
+    rs.pointcloud.working = false;
+    rs.pointcloud.available = false;
+    rs.pointcloud.thread = std::thread([this](){ pointcloud_loop();});
   }
 
   RCLCPP_INFO(get_logger(), "Camera opened");
   while (keep_running.load())
   {    
-    rs2::frameset frames = capture.pipeline.wait_for_frames();
+    rs2::frameset frames = rs.capture.pipeline.wait_for_frames();
     rs2::video_frame color_frame = frames.get_color_frame();
     rs2::depth_frame depth_frame = frames.get_depth_frame();
 
-    push_gst_frame(color_frame.get_data());
+    push_gst_frame((void*)color_frame.get_data());
 
     // image
     if (image.interval_i == 0 && image.enable)
@@ -178,19 +178,19 @@ void RealsenseStreamer::run()
     if (pointcloud.enable) pointcloud.interval_i++;
     if (pointcloud.interval_i >= pointcloud.interval && pointcloud.enable)
     {
-      pointcloud.mutex.lock();
-      if (pointcloud.working == false)
+      rs.pointcloud.mutex.lock();
+      if (rs.pointcloud.working == false)
       {
-        pointcloud.available = true;
-        pointcloud.frameset = frames;
+        rs.pointcloud.available = true;
+        rs.pointcloud.frameset = frames;
         pointcloud.interval_i = 0;
       }
-      pointcloud.mutex.unlock();
+      rs.pointcloud.mutex.unlock();
     }
   }
 
-  if (pointcloud.enable) pointcloud.thread.join();
-  capture.pipeline.stop();
+  if (pointcloud.enable) rs.pointcloud.thread.join();
+  rs.capture.pipeline.stop();
   RCLCPP_INFO(get_logger(), "Closed camera");
 
   deinit();

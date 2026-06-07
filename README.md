@@ -1,7 +1,7 @@
-# quac-realsense-streamer
-quac_realsense_streamer package
+# quac-cam-streams
+quac_cam_streams package
 
-## realsense_streamer
+## cam_streamer
 
 Streams video over udp with gstreamer and high resolution bgrd images and pointcloud with ros2
 
@@ -15,7 +15,7 @@ Streams video over udp with gstreamer and high resolution bgrd images and pointc
 
 ```
 capture:
-  serial_number: String       # realsense camera serial number
+  device_id: String           # camera device id
 
   fps: int                    # video fps
   color:
@@ -27,9 +27,6 @@ capture:
 
 gst:
   port: int                   # udp port to which gstreamer streams
-  width: int                  # (scaled) width of the gstreamer stream
-  height: int                 # (scaled) height of the gstreamer stream
-
   compression: String         # compression type, either "jpeg" or "h264" 
   jpeg:
     quality: int              # jpeg quality in percent
@@ -46,3 +43,6 @@ image:
   interval: int               # interval in all frames in which bgrd image is published
   frame: String               # tf frame of color camera
 ```
+
+## realsense_streamer : cam_streamer
+## depthai_streamer : cam_streamer

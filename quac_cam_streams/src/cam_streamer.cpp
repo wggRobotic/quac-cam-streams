@@ -1,11 +1,5 @@
 #include "cam_streamer/cam_streamer.hpp"
 
-std::atomic<bool> keep_running{true};
-
-void handle_signal(int signum) {
-  keep_running.store(false);
-}
-
 CamStreamer::CamStreamer(const std::string& name) : Node(name)
 {
   //capture
@@ -32,12 +26,6 @@ CamStreamer::CamStreamer(const std::string& name) : Node(name)
 
   //gst
   {
-    declare_parameter<int>("gst.width", 640);
-    gst.width = get_parameter("gst.width").as_int();
-
-    declare_parameter<int>("gst.height", 480);
-    gst.height = get_parameter("gst.height").as_int();
-
     declare_parameter<int>("gst.port", 5000);
     gst.port = get_parameter("gst.port").as_int();
 
@@ -118,8 +106,6 @@ CamStreamer::CamStreamer(const std::string& name) : Node(name)
     "      width: %d\n"
     "      height: %d\n"
     "  gst:\n"
-    "    width: %d\n"
-    "    height: %d\n"
     "    port: %d\n"
     "    compression: %s\n"
     "    jpeg:\n"
@@ -136,7 +122,7 @@ CamStreamer::CamStreamer(const std::string& name) : Node(name)
     "    interval: %d\n"
     "    frame: %s\n",
     capture.device_id.c_str(), capture.fps, capture.color.width, capture.color.height, capture.depth.width, capture.depth.height,
-    gst.width, gst.height, gst.port, gst.compression.c_str(), gst.jpeg.quality, gst.h264.bitrate, gst.h264.key_int_max,
+    gst.port, gst.compression.c_str(), gst.jpeg.quality, gst.h264.bitrate, gst.h264.key_int_max,
     pointcloud.enable ? "true" : "false", pointcloud.interval, pointcloud.frame.c_str(),
     image.enable ? "true" : "false", image.interval, image.frame.c_str()
   );
@@ -162,9 +148,7 @@ void CamStreamer::push_gst_frame(void* data)
           ",height=" + std::to_string(capture.color.height) +
           ",framerate=" + std::to_string(capture.fps) + "/1 "
           "! videoconvert "
-          "! videoscale "
-          "! video/x-raw,width=" + std::to_string(gst.width) + ",height=" + std::to_string(gst.height) + " "
-          "jpegenc quality=" + std::to_string(gst.jpeg.quality) + " ! rtpjpegpay"
+          "! jpegenc quality=" + std::to_string(gst.jpeg.quality) + " ! rtpjpegpay"
           "! udpsink host=" + gst.ip +
           " port=" + std::to_string(gst.port) + " sync=false";  
       }
@@ -176,12 +160,10 @@ void CamStreamer::push_gst_frame(void* data)
           ",height=" + std::to_string(capture.color.height) +
           ",framerate=" + std::to_string(capture.fps) + "/1 "
           "! videoconvert "
-          "! videoscale "
-          "! video/x-raw,width=" + std::to_string(gst.width) + ",height=" + std::to_string(gst.height) + " "
           "! x264enc speed-preset=ultrafast tune=zerolatency "
-          "bitrate=" + std::to_string(gst.h264.bitrate) +
+          " bitrate=" + std::to_string(gst.h264.bitrate) +
           " key-int-max=" + std::to_string(gst.h264.key_int_max) + " "
-          "! rtph264pay config-interval=1 "
+          "! rtph264pay pt=96 config-interval=1 "
           "! udpsink host=" + gst.ip +
           " port=" + std::to_string(gst.port) + " sync=false";
       }
