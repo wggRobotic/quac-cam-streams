@@ -7,7 +7,9 @@ DepthaiStreamer::DepthaiStreamer() : CamStreamer("depthai_streamer") {}
 
 bool camera_is_connected(const std::string& id)
 {
-  for(const auto& deviceInfo : dai::Device::getAllConnectedDevices())
+  auto devices = dai::Device::getAllConnectedDevices();
+  printf("%d device connected \n", devices.size()); fflush(stdout);
+  for(const auto& deviceInfo : devices)
     if(deviceInfo.getDeviceId() == id) return true;
 
   return false;
@@ -22,20 +24,23 @@ void DepthaiStreamer::run()
     return;
   }
 
-  dai.color_cam_node = dai.pipeline.create<dai::node::Camera>();
+  dai.device = std::make_shared<dai::Device>(dai::DeviceInfo(capture.device_id));
+  dai.pipeline = std::make_shared<dai::Pipeline>(dai.device);
+
+  dai.color_cam_node = dai.pipeline->create<dai::node::Camera>();
   dai.color_cam_node->build(dai::CameraBoardSocket::CAM_A);
 
-  dai.left_cam_node = dai.pipeline.create<dai::node::Camera>();
+  dai.left_cam_node = dai.pipeline->create<dai::node::Camera>();
   dai.left_cam_node->build(dai::CameraBoardSocket::CAM_B);
 
-  dai.right_cam_node = dai.pipeline.create<dai::node::Camera>();
+  dai.right_cam_node = dai.pipeline->create<dai::node::Camera>();
   dai.right_cam_node->build(dai::CameraBoardSocket::CAM_C);
 
-  dai.stereo_depth_node = dai.pipeline.create<dai::node::StereoDepth>();
+  dai.stereo_depth_node = dai.pipeline->create<dai::node::StereoDepth>();
   dai.stereo_depth_node->setExtendedDisparity(true);
   dai.stereo_depth_node->setDefaultProfilePreset(dai::node::StereoDepth::PresetMode::FAST_ACCURACY);
 
-  dai.sync_node = dai.pipeline.create<dai::node::Sync>();
+  dai.sync_node = dai.pipeline->create<dai::node::Sync>();
   dai.sync_node->setSyncThreshold(std::chrono::duration<int64_t, std::nano>(static_cast<int64_t>(1e9 / (4.0 * (double)capture.fps))));
 
   dai.color_cam_out = dai.color_cam_node->requestOutput(std::make_pair(capture.color.width, capture.color.height), dai::ImgFrame::Type::BGR888i, dai::ImgResizeMode::CROP, capture.fps, true);
@@ -50,8 +55,17 @@ void DepthaiStreamer::run()
   dai.color_cam_out->link(dai.stereo_depth_node->inputAlignTo);
 
   dai.queue = dai.sync_node->out.createOutputQueue(1, false);
+  
+  
+  auto calib_data = dai.device->readCalibration();
+  auto intrinsics = calib_data.getCameraIntrinsics(
+    dai::CameraBoardSocket::CAM_A, 
+    capture.color.width, 
+    capture.color.height
+  );
+  
 
-  dai.pipeline.start();
+  dai.pipeline->start();
 
   signal(SIGTERM, handle_signal);
   signal(SIGINT, handle_signal);
@@ -59,7 +73,7 @@ void DepthaiStreamer::run()
 
   RCLCPP_INFO(get_logger(), "Camera opened");
   
-  while (keep_running.load() && dai.pipeline.isRunning())
+  while (keep_running.load() && dai.pipeline->isRunning())
   {
     auto message_group = dai.queue->get<dai::MessageGroup>();
 
@@ -73,31 +87,47 @@ void DepthaiStreamer::run()
 
       push_gst_frame(color_frame.data);
 
-      image.msg.header.stamp = now();
-      image.msg.header.frame_id = image.frame;
+      sensor_msgs::msg::CameraInfo cam_info;
+      cam_info.header.stamp = now();
+      cam_info.header.frame_id = image.frame;
+      cam_info.width = capture.color.width;
+      cam_info.height = capture.color.height;
+      cam_info.k[0] = intrinsics[0][0];
+      cam_info.k[2] = intrinsics[0][2];
+      cam_info.k[4] = intrinsics[1][1];
+      cam_info.k[5] = intrinsics[1][2];
 
-      image.msg.height = capture.color.height;
-      image.msg.width = capture.color.width;
-      image.msg.depth_scale = 0.001;
+      cam_info_publisher->publish(cam_info);
 
-      image.msg.fx = 100;
-      image.msg.fy = 100;
-      image.msg.ppx = 100;
-      image.msg.ppy = 100;
+      // image
+      if (image.interval_i == 0 && image.enable)
+      {
+        image.msg.header = cam_info.header;
 
-      image.msg.bgr_data.resize(capture.color.width * capture.color.height * 3);
-      memcpy(image.msg.bgr_data.data(), color_frame.data, capture.color.width * capture.color.height * 3);
+        image.msg.height = capture.color.height;
+        image.msg.width = capture.color.width;
+        image.msg.depth_scale = 0.001;
 
-      image.msg.depth_data.resize(capture.color.width * capture.color.height);
-      memcpy(image.msg.depth_data.data(), depth_frame.data, capture.color.width * capture.color.height * 2);
+        image.msg.fx = 100;
+        image.msg.fy = 100;
+        image.msg.ppx = 100;
+        image.msg.ppy = 100;
 
-      image.publisher->publish(image.msg);
-    
+        image.msg.bgr_data.resize(capture.color.width * capture.color.height * 3);
+        memcpy(image.msg.bgr_data.data(), color_frame.data, capture.color.width * capture.color.height * 3);
+
+        image.msg.depth_data.resize(capture.color.width * capture.color.height);
+        memcpy(image.msg.depth_data.data(), depth_frame.data, capture.color.width * capture.color.height * 2);
+
+        image.publisher->publish(image.msg);
+      }
+      if (image.enable) image.interval_i = (image.interval_i + 1) % image.interval;
+
     }
   }
 
-  dai.pipeline.stop();
-  dai.pipeline.wait();
+  dai.pipeline->stop();
+  dai.pipeline->wait();
 
   RCLCPP_INFO(get_logger(), "Closed camera");
 

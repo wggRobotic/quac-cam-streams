@@ -3,6 +3,7 @@
 #include <quac_interfaces/msg/image_bgrd.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
 #include <sensor_msgs/point_cloud2_iterator.hpp>
+#include <sensor_msgs/msg/camera_info.hpp>
 #include <gst/gst.h>
 #include <gst/app/gstappsrc.h>
 
@@ -74,4 +75,5 @@ public:
     quac_interfaces::msg::ImageBGRD msg;
   } image;
 
+  rclcpp::Publisher<sensor_msgs::msg::CameraInfo>::SharedPtr cam_info_publisher;
 };

@@ -94,6 +94,11 @@ CamStreamer::CamStreamer(const std::string& name) : Node(name)
     rclcpp::QoS(2).best_effort().durability_volatile()
   );
 
+  cam_info_publisher = create_publisher<sensor_msgs::msg::CameraInfo>(
+    std::string(get_name()) + "/info", 
+    2
+  );
+
   RCLCPP_INFO(get_logger(), 
     "Started with the following configuration:\n"
     "  capture:\n"

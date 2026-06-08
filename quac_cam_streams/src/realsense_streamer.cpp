@@ -139,6 +139,22 @@ void RealsenseStreamer::run()
 
     push_gst_frame((void*)color_frame.get_data());
 
+    rs2::video_stream_profile color_profile = 
+    color_frame.get_profile().as<rs2::video_stream_profile>();
+    rs2_intrinsics color_intr = color_profile.get_intrinsics();
+
+    sensor_msgs::msg::CameraInfo cam_info;
+    cam_info.header.stamp = now();
+    cam_info.header.frame_id = image.frame;
+    cam_info.width = capture.color.width;
+    cam_info.height = capture.color.height;
+    cam_info.k[0] = color_intr.fx;
+    cam_info.k[2] = color_intr.ppx;
+    cam_info.k[4] = color_intr.fy;
+    cam_info.k[5] = color_intr.ppy;
+
+    cam_info_publisher->publish(cam_info);
+    
     // image
     if (image.interval_i == 0 && image.enable)
     {
@@ -147,21 +163,15 @@ void RealsenseStreamer::run()
 
       if (!aligned_depth_frame) continue;
 
-      image.msg.header.stamp = now();
-      image.msg.header.frame_id = image.frame;
-
+      image.msg.header = cam_info.header;
       image.msg.height = capture.color.height;
       image.msg.width = capture.color.width;
       image.msg.depth_scale = aligned_depth_frame.get_units();
 
-      rs2::video_stream_profile color_profile = 
-      color_frame.get_profile().as<rs2::video_stream_profile>();
-      rs2_intrinsics intr = color_profile.get_intrinsics();
-
-      image.msg.fx = intr.fx;
-      image.msg.fy = intr.fy;
-      image.msg.ppx = intr.ppx;
-      image.msg.ppy = intr.ppy;
+      image.msg.fx = color_intr.fx;
+      image.msg.fy = color_intr.fy;
+      image.msg.ppx = color_intr.ppx;
+      image.msg.ppy = color_intr.ppy;
 
       image.msg.bgr_data.resize(capture.color.width * capture.color.height * 3);
       memcpy(image.msg.bgr_data.data(), color_frame.get_data(), capture.color.width * capture.color.height * 3);

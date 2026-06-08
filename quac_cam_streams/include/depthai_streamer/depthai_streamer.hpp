@@ -15,7 +15,8 @@ public:
 
   struct
   {
-    dai::Pipeline pipeline;
+    std::shared_ptr<dai::Device> device;
+    std::shared_ptr<dai::Pipeline> pipeline;
 
     std::shared_ptr<dai::node::Camera> color_cam_node;
     dai::Node::Output* color_cam_out;
@@ -30,7 +31,6 @@ public:
     std::shared_ptr<dai::node::Sync> sync_node;
 
     std::shared_ptr<dai::node::PointCloud> pointcloud_node;
-    std::shared_ptr<dai::Device> device;
     std::shared_ptr<dai::MessageQueue> queue;
   } dai;
 
